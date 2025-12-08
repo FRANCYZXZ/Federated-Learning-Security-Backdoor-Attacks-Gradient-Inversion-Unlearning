@@ -1,0 +1,5 @@
+data/
+venv/
+__pycache__/
+reconstructed_images/
+checkpoints/
