@@ -28,7 +28,7 @@ FRAC_PEERS = 1 #'the fraction of peers: C to bel selected in each round'
 SEED = 2 #fixed seed
 random.seed(SEED)
 CRITERION = nn.CrossEntropyLoss()
-GLOBAL_ROUNDS = 20 #"number of rounds of federated model training"
+GLOBAL_ROUNDS = 1 #"number of rounds of federated model training"
 LOCAL_EPOCHS = 1 #"the number of local epochs: E for each peer"
 TEST_BATCH_SIZE = 1
 LOCAL_BS = 32 #"local batch size: B for each peer"
@@ -61,26 +61,10 @@ SAMPLES_PER_CLASS = 582
 RATE_UNBALANCE = 1
 
 #Baseline|: FedAvg-no attacks (FL)
-# RULE = 'fedavg'
-# ATTACK_TYPE='backdoor'
-# MALICIOUS_BEHAVIOR_RATE = 1
-# for atr in [0.3]:           #[0, 0.1, 0.2]
-#     run_exp(dataset_name = DATASET_NAME, model_name = MODEL_NAME, dd_type = DD_TYPE, num_peers = NUM_PEERS, 
-#             frac_peers = FRAC_PEERS, seed = SEED, test_batch_size = TEST_BATCH_SIZE,
-#                 criterion = CRITERION, global_rounds = GLOBAL_ROUNDS, local_epochs = LOCAL_EPOCHS, local_bs = LOCAL_BS, 
-#                  local_lr = LOCAL_LR, local_momentum = LOCAL_MOMENTUM, labels_dict = LABELS_DICT, device = DEVICE,
-#                 attackers_ratio = atr, attack_type=ATTACK_TYPE, 
-#                  malicious_behavior_rate = MALICIOUS_BEHAVIOR_RATE, rule = RULE,
-#                 source_class = SOURCE_CLASS, target_class = TARGET_CLASS,
-#                class_per_peer = CLASS_PER_PEER, samples_per_class = SAMPLES_PER_CLASS, 
-#                rate_unbalance = RATE_UNBALANCE, alpha = ALPHA, resume = False,
-#                reconstruction_only = True) #True for image reconstruction 
-    
-
-RULE = 'fl_defender'
+RULE = 'fedavg'
 ATTACK_TYPE='backdoor'
 MALICIOUS_BEHAVIOR_RATE = 1
-for atr in [0.2]:
+for atr in [0.3]:           #[0, 0.1, 0.2]
     run_exp(dataset_name = DATASET_NAME, model_name = MODEL_NAME, dd_type = DD_TYPE, num_peers = NUM_PEERS, 
             frac_peers = FRAC_PEERS, seed = SEED, test_batch_size = TEST_BATCH_SIZE,
                 criterion = CRITERION, global_rounds = GLOBAL_ROUNDS, local_epochs = LOCAL_EPOCHS, local_bs = LOCAL_BS, 
@@ -89,4 +73,20 @@ for atr in [0.2]:
                  malicious_behavior_rate = MALICIOUS_BEHAVIOR_RATE, rule = RULE,
                 source_class = SOURCE_CLASS, target_class = TARGET_CLASS,
                class_per_peer = CLASS_PER_PEER, samples_per_class = SAMPLES_PER_CLASS, 
-               rate_unbalance = RATE_UNBALANCE, alpha = ALPHA, resume = False, reconstruction_only = False)
+               rate_unbalance = RATE_UNBALANCE, alpha = ALPHA, resume = False,
+               reconstruction_only = False) #True for image reconstruction 
+    
+
+# RULE = 'fl_defender'
+# ATTACK_TYPE='backdoor'
+# MALICIOUS_BEHAVIOR_RATE = 1
+# for atr in [0.2]:
+#     run_exp(dataset_name = DATASET_NAME, model_name = MODEL_NAME, dd_type = DD_TYPE, num_peers = NUM_PEERS, 
+#             frac_peers = FRAC_PEERS, seed = SEED, test_batch_size = TEST_BATCH_SIZE,
+#                 criterion = CRITERION, global_rounds = GLOBAL_ROUNDS, local_epochs = LOCAL_EPOCHS, local_bs = LOCAL_BS, 
+#                  local_lr = LOCAL_LR, local_momentum = LOCAL_MOMENTUM, labels_dict = LABELS_DICT, device = DEVICE,
+#                 attackers_ratio = atr, attack_type=ATTACK_TYPE, 
+#                  malicious_behavior_rate = MALICIOUS_BEHAVIOR_RATE, rule = RULE,
+#                 source_class = SOURCE_CLASS, target_class = TARGET_CLASS,
+#                class_per_peer = CLASS_PER_PEER, samples_per_class = SAMPLES_PER_CLASS, 
+#                rate_unbalance = RATE_UNBALANCE, alpha = ALPHA, resume = False, reconstruction_only = False)

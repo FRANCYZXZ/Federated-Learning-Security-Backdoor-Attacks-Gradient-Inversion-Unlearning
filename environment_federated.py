@@ -25,7 +25,7 @@ from IPython.display import clear_output
 import gc
 import torchvision
 
-checkpoint_name = "checkpoints/backdoor_CIFAR10_ResNet18_IID_fl_defender_epoch_20.t7"
+checkpoint_name = "checkpoints/backdoor_CIFAR10_ResNet18_IID_fl_defender_epoch_20_prova.t7"
 
 
 class Peer():
@@ -70,58 +70,41 @@ class Peer():
         x_offset, y_offset = backdoor_pattern.shape[0], backdoor_pattern.shape[1]
         train_loader = DataLoader(copy.deepcopy(self.local_data), self.local_bs, shuffle = True, drop_last=True)
         
-        # Optimizer (Serve solo se facciamo training reale)
         if not reconstruction_mode:
             if dataset_name == 'IMDB': optimizer = optim.Adam(model.parameters(), lr=self.local_lr)
             else: optimizer = optim.SGD(model.parameters(), lr=self.local_lr, momentum=self.local_momentum, weight_decay=5e-4)
             model.train()
         else:
-            model.eval() # In ricostruzione usiamo eval
+            model.eval() 
 
         epochs_loss = []    
 
-        # Loop delle epoche locali
         for epoch in range(self.local_epochs):
             epoch_loss = []
             for batch_idx, (data, target) in enumerate(train_loader):
                 data, target = data.to(self.device), target.to(self.device)
                 if dataset_name == 'IMDB': target = target.view(-1,1)
-
-                # ==================================================================
-                # LOGICA ATTACCO (Comune a Training e Ricostruzione)
-                # ==================================================================
-                # Qui simuliamo il comportamento "Normale" della rete:
-                # L'attacco scatta solo se il peer è 'attacker' E se la probabilità è soddisfatta.
-                
                 is_attacking_now = False
                 if (attack_type == 'backdoor') and (self.peer_type == 'attacker'):
-                    # Usciamo la stessa logica probabilistica
                     if np.random.random() <= malicious_behavior_rate:
                         is_attacking_now = True
                         
-                        # Iniezione Backdoor
                         pdata = data.clone(); ptarget = target.clone()
                         keep_idxs = (target == source_class)
                         pdata = pdata[keep_idxs]; ptarget = ptarget[keep_idxs]
                         pdata[:, :, -x_offset:, -y_offset:] = backdoor_pattern
                         ptarget[:] = target_class
                         
-                        # Se stiamo solo ricostruendo, ci basta un batch, non serve concatenare tutto per il training
                         if reconstruction_mode:
-                            # Prendiamo solo l'immagine infetta per la ricostruzione
                             if len(pdata) > 0:
                                 target_img = pdata[-1].unsqueeze(0).detach().clone()
                                 target_label = ptarget[-1].unsqueeze(0).detach().clone()
                             else:
-                                is_attacking_now = False # Niente da attaccare in questo batch
+                                is_attacking_now = False 
                         else:
-                            # Se è training, aggiungiamo al batch
                             data = torch.cat([data, pdata], dim=0)
                             target = torch.cat([target, ptarget], dim=0)
 
-                # ==================================================================
-                # RAMO A: SOLO RICOSTRUZIONE (Se attivo e se l'attacco è scattato)
-                # ==================================================================
                 if reconstruction_mode:
                     if is_attacking_now:
                         print(f"\n[RECON] Peer {self.peer_id} (Attacker) decided to attack in this round! Starting Gradient Inversion...")
@@ -130,7 +113,6 @@ class Peer():
                             PROJECT_ROOT = os.getcwd()
                             INVGRAD_PATH = os.path.join(PROJECT_ROOT, "invertinggradients")
                             
-                            # Se non è nel path, aggiungila
                             if INVGRAD_PATH not in sys.path:
                                 sys.path.append(INVGRAD_PATH)
                             
@@ -156,7 +138,7 @@ class Peer():
                             config['max_iterations'] = 8000
                             config['cost_fn'] = 'sim'
                             config['optim'] = 'adam'
-                            config['lr'] = 0.1        #prova 0.05 o 0.1
+                            config['lr'] = 0.1        
                             config['total_variation'] = 1e-2
                             config['boxed'] = True
                             config['restarts'] = 3
@@ -184,9 +166,6 @@ class Peer():
                         # passiamo al prossimo batch o finiamo.
                         continue 
 
-                # ==================================================================
-                # RAMO B: TRAINING NORMALE
-                # ==================================================================
                 model.zero_grad()
                 output = model(data)
                 loss = self.criterion(output, target)
@@ -197,7 +176,6 @@ class Peer():
             if not reconstruction_mode:
                 epochs_loss.append(np.mean(epoch_loss))
         
-        # Fine metodo
         model = model.cpu()
         return model, np.mean(epochs_loss) if epochs_loss else 0.0
 
@@ -375,16 +353,10 @@ class FL:
             
     def run_experiment(self, attack_type = 'no_attack', malicious_behavior_rate = 0,
         source_class = None, target_class = None, rule = 'fedavg', resume = False, #False by default
-        reconstruction_only = False): # <--- Parametro aggiunto
+        reconstruction_only = False):
         
         simulation_model = copy.deepcopy(self.global_model)
         
-        # Costruiamo il percorso del checkpoint
-        #checkpoint_name = './checkpoints/'+ attack_type + '_' + self.dataset_name + '_' + self.model_name + '_' + self.dd_type + '_'+ rule + '_'+ str(self.attackers_ratio) + '.t7'
-        #'./checkpoints/'+ attack_type + '_' + self.dataset_name + '_' + self.model_name + '_' + self.dd_type + '.t7'
-        # =================================================================
-        # CASO A: SOLO RICOSTRUZIONE (Post-Training Attack)
-        # =================================================================
         if reconstruction_only:
             print("\n" + "="*60)
             print(f" MODALITÀ RICOSTRUZIONE ATTIVA (Skip Training)")
@@ -392,10 +364,9 @@ class FL:
             print("="*60)
             
             if not os.path.exists(checkpoint_name):
-                print(f"❌ ERRORE: Il checkpoint {checkpoint_name} non esiste. Esegui prima il training.")
+                print(f"ERRORE: Il checkpoint {checkpoint_name} non esiste. Esegui prima il training.")
                 return
 
-            # Carica Pesi (con fix per PyTorch 2.6+)
             checkpoint = torch.load(checkpoint_name, map_location=self.device, weights_only=False)
             if 'state_dict' in checkpoint:
                 simulation_model.load_state_dict(checkpoint['state_dict'])
@@ -404,11 +375,9 @@ class FL:
             
             simulation_model.to(self.device)
             
-            # Simula un round virtuale per lanciare l'attacco
             print("--> Avvio simulazione round per intercettazione...")
             selected_peers = self.choose_peers()
             
-            # Troviamo gli attaccanti in questo round
             attackers_in_round = [p for p in selected_peers if self.peers[p].peer_type == 'attacker']
             
             if not attackers_in_round:
@@ -416,39 +385,27 @@ class FL:
                 return
 
             for peer_idx in selected_peers:
-                # Eseguiamo update solo sugli attaccanti per risparmiare tempo, o su tutti per realismo
-                # Qui eseguiamo solo sugli attaccanti perché ci interessa la ricostruzione
                 if self.peers[peer_idx].peer_type == 'attacker':
-                    # Passiamo una copia del modello per sicurezza
                     peer_model = copy.deepcopy(simulation_model)
-                    
-                    # Chiamiamo participant_update con reconstruction_mode=True
                     self.peers[peer_idx].participant_update(
-                        global_epoch=999, # Dummy
+                        global_epoch=999, 
                         model=peer_model,
                         attack_type=attack_type,
-                        malicious_behavior_rate=malicious_behavior_rate, # Usa probabilità reale
+                        malicious_behavior_rate=malicious_behavior_rate, 
                         source_class=source_class,
                         target_class=target_class,
                         dataset_name=self.dataset_name,
-                        reconstruction_mode=True # <--- Attiva la logica di ricostruzione
+                        reconstruction_mode=True 
                     )
                     del peer_model
             
             print("\n--> Simulazione attacco terminata.")
-            return # ESCE QUI, NON FA IL TRAINING LOOP
-
-        # =================================================================
-        # CASO B: TRAINING REALE (Codice Originale)
-        # =================================================================
+            return 
+        
         print('\n===> Simulation started (TRAINING MODE)...')
         fg = FoolsGold(self.num_peers)
         fl_dfndr = FLDefender(self.num_peers)
         
-        # ... (Qui sotto incolla tutto il resto del tuo metodo run_experiment originale) ...
-        # ... (da "global_weights = simulation_model.state_dict()" in giù) ...
-        
-        # --- INIZIO CODICE ORIGINALE ---
         global_weights = simulation_model.state_dict()
         last10_updates = []
         test_losses = []
@@ -459,7 +416,6 @@ class FL:
         start_round = 0
         if resume:
             print('Loading last saved checkpoint..')
-            # Usa checkpoint_name definito sopra
             checkpoint = torch.load(checkpoint_name, weights_only=False)
             simulation_model.load_state_dict(checkpoint['state_dict'])
             start_round = checkpoint['epoch'] + 1
@@ -483,7 +439,6 @@ class FL:
             for peer in selected_peers:
                 peers_types.append(self.peers[peer].peer_type)
                 
-                # Chiamata standard (reconstruction_mode=False di default)
                 peer_local_model, peer_loss = self.peers[peer].participant_update(epoch, 
                 copy.deepcopy(simulation_model),
                 attack_type = attack_type, malicious_behavior_rate = malicious_behavior_rate, 
@@ -495,12 +450,6 @@ class FL:
                 local_models.append(peer_local_model) 
                 i+= 1
             
-            # ... (Resto della logica di aggregazione, test e salvataggio) ...
-            # ... (Copia tutto il resto del codice originale fino alla fine del metodo) ...
-            
-            # Assicurati che il salvataggio usi 'checkpoint_name' o lo ricostruisca uguale
-            # savepath = checkpoint_name
-            # torch.save(state, savepath)     
             loss_avg = sum(local_losses) / len(local_losses)
             print('Average of peers\' local losses: {:.6f}'.format(loss_avg))
             #aggregated global weights
@@ -601,18 +550,15 @@ class FL:
             
             state = {
                 'epoch': epoch,
-                'state_dict': simulation_model.state_dict(), # Salviamo solo il modello globale
-                # 'local_models': ... RIMOSSO PER SALVARE SPAZIO!
+                'state_dict': simulation_model.state_dict(), 
+                # 'local_models': 
                 'test_losses': test_losses,
                 'global_accuracies': global_accuracies,
                 'source_class_accuracies': source_class_accuracies,
-                # Aggiungiamo metriche utili
                 'lf_asr': lf_asr if 'lf_asr' in locals() else 0,
                 'backdoor_asr': backdoor_asr if 'backdoor_asr' in locals() else 0
             }
             
-            # Usiamo la variabile definita all'inizio per garantire che il nome sia identico
-            # a quello che cerchiamo di caricare
             torch.save(state, checkpoint_name)
 
             del local_models

@@ -6,7 +6,7 @@ def run_exp(dataset_name, model_name, dd_type,
     local_epochs, local_bs, local_lr , local_momentum , labels_dict, device, 
     attackers_ratio, attack_type, malicious_behavior_rate, rule, 
     class_per_peer, samples_per_class, rate_unbalance, alpha, source_class, target_class, resume,
-    reconstruction_only=False): # <--- 1. AGGIUNTO PARAMETRO QUI (Default False)
+    reconstruction_only=False):
 
     print('\n--> Starting experiment...')
     
@@ -32,6 +32,6 @@ def run_exp(dataset_name, model_name, dd_type,
     flEnv.run_experiment(attack_type = attack_type, malicious_behavior_rate = malicious_behavior_rate, 
                     source_class = source_class, target_class = target_class, 
                     rule=rule, resume = resume, 
-                    reconstruction_only=reconstruction_only) # <--- 2. PASSATO IL PARAMETRO QUI
+                    reconstruction_only=reconstruction_only) 
                     
     print('\n--> End of Experiment.')
